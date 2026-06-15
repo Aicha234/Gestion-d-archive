@@ -1,0 +1,214 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-11">
+        <div class="mb-4">
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-2"></i>Accueil</a>
+        </div>
+
+        <div class="text-center mb-5">
+    <h2 class="fw-bold text-dark">
+        <i class="fa-solid fa-magnifying-glass text-primary me-2"></i> Moteur de Recherche Intelligent
+    </h2>
+    <p class="text-muted small">Recherche instantanée directe via Meilisearch</p>
+</div>
+
+        <div class="row justify-content-center mb-4">
+            <div class="col-md-8">
+                <div class="card p-0 shadow-sm border-0">
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fa-solid fa-search"></i></span>
+                        <input type="text" id="searchInput" class="form-control border-start-0 fs-6 py-2" placeholder="Tapez un mot ou une phrase...">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12" id="mainArea" style="transition: all 0.3s;">
+                <div id="resultsContainer" class="row g-3">
+                    </div>
+            </div>
+
+            <div class="col-md-3" id="sidebarFilters" style="display: none; opacity: 0; transition: opacity 0.3s;">
+                <div class="card p-3 shadow-sm border-0 sticky-top">
+                    <h6 class="fw-bold mb-3 text-primary">Filtres</h6>
+                    <select id="authorFilter" class="form-select mb-3">
+                        <option value="">Tous les auteurs</option>
+                        {% for author in authors %}
+                            <option value="{{ author.username }}">{{ author.username }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="number" id="yearFilter" class="form-control mb-3" placeholder="Année">
+                    <input type="number" id="monthFilter" class="form-control mb-3" placeholder="Mois (1-12)">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const searchInput = document.getElementById('searchInput');
+    const authorFilter = document.getElementById('authorFilter');
+    const yearFilter = document.getElementById('yearFilter');
+    const monthFilter = document.getElementById('monthFilter');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const sidebar = document.getElementById('sidebarFilters');
+    const mainArea = document.getElementById('mainArea');
+
+    let searchAbortController = null;
+
+
+    searchInput.addEventListener('input', () => {
+        if (searchInput.value.trim().length > 0) {
+            
+            sidebar.style.display = 'block';
+            setTimeout(() => { sidebar.style.opacity = '1'; }, 10);
+            mainArea.classList.replace('col-12', 'col-md-9');
+        } else {
+            
+            sidebar.style.opacity = '0';
+            setTimeout(() => { 
+                sidebar.style.display = 'none'; 
+                mainArea.classList.replace('col-md-9', 'col-12');
+            }, 300);
+        }
+        triggerSearch(); 
+    });
+
+    
+
+    async function triggerSearch() {
+        const query = searchInput.value.trim();
+        
+        
+        sessionStorage.setItem('last_search_query', query);
+        
+        const author = authorFilter.value;
+        const year = yearFilter.value.trim();
+        const month = monthFilter.value.trim();
+
+        if (searchAbortController) {
+            searchAbortController.abort();
+        }
+
+        if (query.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="col-12 text-center p-5 text-muted">
+                    <i class="fa-solid fa-keyboard fa-2x mb-2 text-black-50"></i>
+                    <p class="small">Commencez à taper maintenant pour afficher les résultats instantanément...</p>
+                </div>`;
+            return; 
+        }
+
+        searchAbortController = new AbortController();
+        const signal = searchAbortController.signal;
+
+        try {
+            const url = `/api/search-instant/?q=${encodeURIComponent(query)}&author=${encodeURIComponent(author)}&year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`;
+            const response = await fetch(url, { signal });
+
+            if (response.status === 200) {
+                const data = await response.json();
+                if (data && data.hits) {
+                    renderResults(data.hits);
+                } else {
+                    renderResults([]);
+                }
+            } else {
+                showErrorMessage();
+            }
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                return;
+            }
+            console.error("Error during fetch:", error);
+            showErrorMessage();
+        }
+    }
+
+    searchInput.addEventListener('input', triggerSearch);
+    authorFilter.addEventListener('change', triggerSearch);
+    yearFilter.addEventListener('input', triggerSearch);
+    monthFilter.addEventListener('input', triggerSearch);
+
+    function showErrorMessage() {
+        resultsContainer.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-danger border-0 small d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>Impossible de se connecter au moteur de recherche pour le moment.</span>
+                </div>
+            </div>
+        `;
+    }
+
+   function renderResults(hits) {
+        if (hits.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="col-12 text-center p-5 text-muted">
+                    <i class="fa-solid fa-face-frown fa-2x mb-2 text-black-50"></i>
+                    <p class="small">Aucun document ne correspond à votre recherche.</p>
+                </div>`;
+            return;
+        }
+
+        let html = '';
+        hits.forEach(hit => {
+            let snippet = '';
+            if (hit._formatted && hit._formatted.content) {
+                snippet = hit._formatted.content;
+            } else {
+                snippet = hit.content ? hit.content.substring(0, 140) + '...' : 'Aucun texte disponible';
+            }
+
+            const docId = hit.id || hit.pk || hit.objectID || hit.doc_id;
+            const authorName = hit.author || 'Inconnu';
+            const docYear = hit.year || '';
+            const docMonth = hit.month || '';
+            const dateStr = (docYear && docMonth) ? ` | <i class="fa-regular fa-calendar ms-1"></i> ${docMonth}/${docYear}` : '';
+
+            html += `
+                <div class="col-12">
+                    <div class="card p-3 border-0 border-start border-4 border-primary bg-white shadow-sm transition-card">
+                        <div class="d-flex justify-content-between align-items-center gap-3">
+                            
+                            <div class="flex-grow-1" style="min-width: 0;">
+                                <h6 class="fw-bold mb-1 text-dark text-truncate">
+                                    <i class="fa-regular fa-file-lines text-primary me-2"></i> 
+                                    ${hit.title || 'Document sans titre'}
+                                </h6>
+                                <p class="text-muted mb-1" style="font-size: 0.8rem;">
+                                    <i class="fa-regular fa-user me-1"></i> Par : <span class="fw-semibold text-secondary">${authorName}</span>
+                                    ${dateStr}
+                                </p>
+                                <p class="text-muted small mb-0 lh-base">
+                                    ${snippet}
+                                </p>
+                            </div>
+                            
+                            <div class="flex-shrink-0 d-flex gap-2">
+                                <a href="/document/${docId}/text/" class="btn btn-sm btn-primary px-3 text-white">
+                                    <i class="fa-solid fa-eye me-1"></i> Afficher
+                                </a>
+                                <a href="/document/${docId}/download/" class="btn btn-sm btn-outline-secondary px-3">
+                                    <i class="fa-solid fa-download me-1"></i> Télécharger
+                                </a>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        resultsContainer.innerHTML = html;
+    }
+    
+</script>
+
+<style>
+    .transition-card { transition: transform 0.15s ease-in-out; }
+    .transition-card:hover { transform: scale(1.005); }
+    mark { background-color: #ffeb3b !important; padding: 0 2px; border-radius: 2px; }
+</style>
+{% endblock %}

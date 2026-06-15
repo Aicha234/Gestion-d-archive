@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="position-relative w-100">
+        <div class="position-absolute top-0 end-0 mt-2 me-2 z-3">
+        <form action="{% url 'logout' %}" method="post" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger px-3 d-flex align-items-center gap-2 shadow-sm bg-white">
+                <i class="fa-solid fa-right-from-bracket"></i>
+                <span>Déconnexion</span>
+            </button>
+        </form>
+    </div>
+
+    <div class="text-center mb-5 pt-3">
+        <h1 class="fw-bold text-dark">Tableau de bord & Espace Collaboratif</h1>
+        <p class="text-muted fs-5">Choisissez l'action que vous souhaitez effectuer maintenant :</p>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        
+        <div class="col-md-5">
+            <a href="{% url 'upload_page' %}" class="text-decoration-none">
+                <div class="card p-5 text-center h-100 bg-white card-interactive">
+                    <div class="text-success mb-3">
+                        <i class="fa-solid fa-cloud-arrow-up fa-4x"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark">Déposer de nouveaux documents</h3>
+                    <p class="text-muted mb-0">Téléchargez vos fichiers PDF ou DOCX</p>
+                </div>
+            </a>
+        </div>
+
+        <div class="col-md-5">
+            <a href="{% url 'search_page' %}" class="text-decoration-none">
+                <div class="card p-5 text-center h-100 bg-white card-interactive">
+                    <div class="text-primary mb-3">
+                        <i class="fa-solid fa-magnifying-glass fa-4x"></i>
+                    </div>
+                    <h3 class="fw-bold text-dark">Recherche Instantanée Intelligente</h3>
+                    <p class="text-muted mb-0">Recherchez dans le texte et le contenu de centaines de milliers de fichiers en une fraction de seconde.</p>
+                </div>
+            </a>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .card-interactive {
+        transition: all 0.25s ease-in-out;
+        border: 1px solid transparent;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.02);
+    }
+    .card-interactive:hover {
+        transform: translateY(-6px);
+        box-shadow: 0 12px 24px rgba(0,0,0,0.08) !important;
+        border-color: #dee2e6;
+    }
+</style>
+{% endblock %}

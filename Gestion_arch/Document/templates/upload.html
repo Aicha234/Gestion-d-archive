@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between mb-4">
+            <a href="{% url 'home' %}" class="btn btn-outline-secondary btn-sm"><i class="fa-solid fa-arrow-left me-2"></i>Accueil</a>
+            <a href="{% url 'search_page' %}" class="btn btn-primary btn-sm">Aller à la recherche <i class="fa-solid fa-magnifying-glass ms-2"></i></a>
+        </div>
+
+            <div id="toastContainer" class="position-fixed top-0 start-50 translate-middle-x p-3 d-none" style="z-index: 1080; margin-top: 20px; min-width: 350px;">
+        <div class="alert alert-success alert-dismissible fade show shadow-lg border-0 d-flex align-items-center mb-0" role="alert">
+            <i class="fa-solid fa-circle-check fs-5 me-2 text-success"></i>
+            <div id="toastMessage" class="fw-bold text-dark"></div>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+
+        <div class="card p-5">
+            <h3 class="fw-bold mb-4 text-center text-dark"><i class="fa-solid fa-file-arrow-up text-success me-2"></i> Téléchargement des documents du système</h3>
+            
+            <form method="POST" enctype="multipart/form-data" id="uploadForm">
+                {% csrf_token %}
+                <div class="dropzone-area p-5 text-center border border-2 border-dashed rounded-3 bg-light position-relative mb-4" id="dropzone" style="transition: all 0.2s;">
+                    <input type="file" name="file" id="fileInput" accept=".pdf,.docx" multiple class="opacity-0 position-absolute w-100 h-100 top-0 start-0" style="cursor: pointer;">
+                    <i class="fa-solid fa-folder-open fa-3x text-muted mb-3" id="uploadIcon" style="transition: color 0.2s;"></i>
+                    <h5 class="fw-bold text-secondary" id="uploadText">Glissez-deposez le fichier ici ou cliquez pour parcourir</h5>
+                    <p class="text-muted small mb-0">Formats supportés : PDF, DOCX uniquement</p>
+                </div>
+                <div id="progressMessage" class="text-center fw-bold text-success mb-3 d-none">Téléchargement : 0%</div>
+
+                <button type="button" id="startUploadBtn" class="btn btn-success w-100 py-2 fw-bold"> Déposer les fichiers 🚀</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadText = document.getElementById('uploadText');
+    const uploadIcon = document.getElementById('uploadIcon');
+    const dropzone = document.getElementById('dropzone');
+    const startUploadBtn = document.getElementById('startUploadBtn');
+    const progressMessage = document.getElementById('progressMessage');
+
+    // Array to store all files currently selected or dropped
+    let selectedFiles = [];
+
+    // Listeners to prevent browser defaults during drag operations
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => e.preventDefault(), false);
+    });
+
+    dropzone.addEventListener('dragover', () => {
+        dropzone.style.borderColor = "#198754";
+        dropzone.style.backgroundColor = "#f0fdf4";
+    });
+
+    dropzone.addEventListener('dragleave', () => {
+        if (selectedFiles.length === 0) {
+            dropzone.style.borderColor = "";
+            dropzone.style.backgroundColor = "";
+        }
+    });
+
+  
+    dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFileSelection(files);
+    });
+
+    
+    fileInput.addEventListener('change', () => {
+        handleFileSelection(fileInput.files);
+    });
+
+    
+    function handleFileSelection(files) {
+        if (files.length === 0) return;
+
+       
+        selectedFiles = Array.from(files).filter(file => {
+            const ext = file.name.split('.').pop().toLowerCase();
+            return ['pdf', 'docx'].includes(ext);
+        });
+
+        if (selectedFiles.length === 1) {
+            uploadText.innerText = "Le fichier sélectionné est : " + selectedFiles[0].name;
+        } else if (selectedFiles.length > 1) {
+            const fileNames = selectedFiles.map(f => f.name).join(', ');
+            uploadText.innerText = "Les fichiers sélectionnés sont : " + fileNames;
+        }
+
+        uploadText.className = "fw-bold text-success";
+        uploadIcon.className = "fa-solid fa-file-circle-check fa-3x text-success";
+        dropzone.style.borderColor = "#198754";
+        dropzone.style.backgroundColor = "#f0fdf4";
+    }
+
+    startUploadBtn.addEventListener('click', async () => {
+        if (selectedFiles.length === 0) return;
+
+        startUploadBtn.disabled = true;
+        progressMessage.classList.remove('d-none');
+        progressMessage.className = "text-primary small fw-bold mb-2"; 
+        const totalFiles = selectedFiles.length;
+        
+    
+        const BATCH_SIZE = 40; 
+
+        let currentDisplayedPercentage = 0;
+        let targetPercentage = 0;
+        let uploadSuccessful = true; 
+
+     
+        const animationTicker = setInterval(() => {
+            if (currentDisplayedPercentage < targetPercentage) {
+                currentDisplayedPercentage += 1;
+                const approximateProcessed = Math.round((currentDisplayedPercentage / 100) * totalFiles);
+                progressMessage.innerText = `Téléchargement : ${currentDisplayedPercentage}% (${approximateProcessed}/${totalFiles})`;
+            }}, 30); 
+
+
+
+        for (let i = 0; i < totalFiles; i += BATCH_SIZE) {
+            const currentChunk = selectedFiles.slice(i, i + BATCH_SIZE);
+            const formData = new FormData();
+
+            currentChunk.forEach(file => {
+                formData.append('file', file);
+            });
+
+            
+            const nextStepProcessed = Math.min(i + BATCH_SIZE, totalFiles);
+            const nextStepPercentage = Math.round((nextStepProcessed / totalFiles) * 100);
+            
+            targetPercentage = nextStepPercentage - 2; 
+
+            try {
+                const response = await fetch("{% url 'upload_page' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                   
+                    targetPercentage = nextStepPercentage;
+                    
+                    while (currentDisplayedPercentage < targetPercentage) {
+                        await new Promise(resolve => setTimeout(resolve, 10));
+                    }
+                } else {
+                    uploadSuccessful = false;
+                    break;
+                }
+            } catch (error) {
+                
+                console.error("Erreur lors de l'envoi du lot:", error);
+                uploadSuccessful = false;
+                break;
+            }
+        }
+
+        if (uploadSuccessful) {
+            targetPercentage = 100;
+            while (currentDisplayedPercentage < 100) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            clearInterval(animationTicker);
+
+            progressMessage.classList.add('d-none');
+
+        
+            const toastContainer = document.getElementById('toastContainer');
+            const toastMessage = document.getElementById('toastMessage');
+
+            
+            if (totalFiles === 1) {
+                toastMessage.innerText = "Le document a été téléchargé avec succès";
+            } else {
+                toastMessage.innerText = `${totalFiles} documents ont été téléchargés avec succès ! 🚀`;
+            }
+
+            
+            toastContainer.classList.remove('d-none');
+                    
+            setTimeout(() => {
+                location.reload();
+            }, 3000);
+
+        } else {
+            
+            clearInterval(animationTicker);
+            startUploadBtn.disabled = false; 
+            progressMessage.className = "text-danger small fw-bold mb-2";
+            const failedCount = totalFiles - Math.round((currentDisplayedPercentage / 100) * totalFiles);
+            progressMessage.innerText = `❌ Échec du téléchargement. (${failedCount} fichiers restants). Veuillez réessayer.`;
+        }
+    });
+</script>
+{% endblock %}

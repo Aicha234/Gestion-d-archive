@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="col-md-5">
+        <div class="card p-4 shadow-sm">
+            <div class="text-center mb-4">
+                <i class="fa-solid fa-shield-halved fa-3x text-primary mb-3"></i>
+                <h3 class="fw-bold text-dark">Connexion</h3>
+                <p class="text-muted small">Bienvenue, veuillez saisir vos identifiants pour accéder à la plateforme.</p>
+            </div>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label text-secondary small">Nom d'utilisateur</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="fa-solid fa-user"></i></span>
+                        <input type="text" name="username" class="form-control bg-light border-start-0" required>
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label text-secondary small">Mot de passe</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-light text-muted border-end-0"><i class="fa-solid fa-lock"></i></span>
+                        <input type="password" name="password" class="form-control bg-light border-start-0" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">Se connecter</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
